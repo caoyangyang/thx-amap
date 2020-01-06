@@ -1,0 +1,150 @@
+<html>
+<script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=1.4.10&key=your_key&plugin=AMap.DistrictSearch"></script>
+<script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=1.4.15&key=your_key&plugin=AMap.PlaceSearch"></script>
+<script type="text/javascript">
+ let cities = [];
+ let districts = [];
+ let schools = [];
+
+ const LEVEL = {
+     country: {
+         index: 1,
+         fileName: null
+     },
+     province: {
+         index: 2,
+         fileName: null
+     },
+     city: {
+         index: 3,
+         fileName: "cities",
+         data: cities
+
+     },
+     distract: {
+         index: 4,
+         fileName: "districts",
+         data: districts
+     },
+     school: {
+         index: 4,
+         fileName: "schools",
+         data: schools
+     }
+ }
+
+ function mapDistrictObject(distract){
+     const {adcode, name, level,districtList}=distract;
+     return {code:adcode, name, level,districtList:!districtList?[]:districtList.map(item=>({code:item.adcode,name:item.name, level:item.level,upperLevelDistrictCode:adcode}))}
+ }
+
+  let count = 0;
+
+ function downloadIsReadyFor(itemLevel) {
+     console.log("download is ready for " + itemLevel.fileName);
+     let downloadData = itemLevel.data;
+     let id = itemLevel.fileName;
+     const eleButton = document.getElementById(id);
+     const funDownload = function (content, filename) {
+         const eleLink = document.createElement('a');
+         eleLink.download = filename;
+         eleLink.style.display = 'none';
+         const blob = new Blob([content]);
+         eleLink.href = URL.createObjectURL(blob);
+         document.body.appendChild(eleLink);
+         eleLink.click();
+         document.body.removeChild(eleLink);
+     };
+     eleButton.addEventListener('click', function () {
+         console.log("--click");
+         funDownload(JSON.stringify(downloadData), id + '.json');
+     });
+ }
+
+ function searchSchoolByAdCode(adcode, pageIndex) {
+     const keywords = '小学';
+     AMap.plugin('AMap.PlaceSearch', function () {
+         const autoOptions = {
+             city: adcode,
+             pageSize :50,
+             type:"科教文化服务;学校;小学",
+             pageIndex
+         }
+         const placeSearch = new AMap.PlaceSearch(autoOptions);
+         placeSearch.search(keywords, function (status, result) {
+              count--;
+             if (result.poiList && result.poiList.count > 50 * pageIndex) {
+                 console.log("count", result.poiList.count);
+                 searchSchoolByAdCode(adcode, pageIndex + 1)
+             }
+
+             if (result.poiList && result.poiList.count > 0) {
+                 let distractWithSchools = result.poiList.pois;
+                 schools.push({adcode, schools: distractWithSchools.map(school=>{
+                     const { address, name, id } = school;
+                     return  { address, name, id }
+                 })})
+             }
+         })
+     })
+ }
+
+ AMap.plugin('AMap.DistrictSearch', function () {
+     const districtSearch = new AMap.DistrictSearch({
+         subdistrict: 1,
+         showbiz: false
+     })
+
+     function searchNextLevelPlace(parentId, handler) {
+         districtSearch.search(parentId, function (status, result) {
+             count--;
+             handler(result.districtList[0])
+         })
+     }
+
+     function fetchIterate(itemList, childrenItemLevel, isEnd, itemHandler) {
+         for (let index = 0; !!itemList && index < itemList.length; index++) {
+             count++;
+             if (isEnd && index === itemList.length - 1) {
+                 downloadIsReadyFor(childrenItemLevel);
+             }
+             setTimeout(function(){itemHandler(itemList[index], index)},count*100)
+         }
+     }
+
+
+     searchNextLevelPlace("中国", function (nationWithProvince) {
+         let provinceList = nationWithProvince.districtList;
+         fetchIterate(provinceList, LEVEL.city, true, (provinceItem, provinceItemIndex) => {
+             searchNextLevelPlace(provinceItem.adcode, function (provinceWithCities) {
+                 cities.push(mapDistrictObject(provinceWithCities));
+                 let cityList = provinceWithCities.districtList;
+                 let isFetchAllCities = provinceItemIndex === provinceList.length - 1;
+
+                 fetchIterate(cityList, LEVEL.distract, isFetchAllCities, (cityItem, cityItemIndex) => {
+                     searchNextLevelPlace(cityItem.citycode, function (cityWithDistracts) {
+                         districts.push(mapDistrictObject(cityWithDistracts));
+                         let districtList = cityWithDistracts.districtList;
+                         let isFetchAllDistract = cityItemIndex === cityList.length - 1;
+
+                         fetchIterate(districtList, LEVEL.school, isFetchAllCities && isFetchAllDistract, (districtItem, districtItemIndex) => {
+                             searchSchoolByAdCode(districtItem.adcode, 1)
+                         })
+                     })
+                 })
+             })
+         })
+     })
+ })
+
+</script>
+<script type="text/javascript" src="https://webapi.amap.com/demos/js/liteToolbar.js"></script>
+<div id="container" class="map">
+<p><input type="button" id="cities" value="cities.json"></p>
+<p><input type="button" id="districts" value="districts.json"></p>
+<p><input type="button" id="schools" value="schools.json"></p>
+</div>
+</body>
+</html>
