@@ -15,14 +15,14 @@ function parseDistrictJsonFile(fileName) {
     fs.readFile(path.join(__dirname, fileName), 'utf8', function (err, result) {
         if (err) throw err;
         const data = JSON.parse(result)
-        var sqlSnippetInit = "INSERT INTO district (code, name, level ,upper_level_district_code)  VALUES \n";
+        let sqlSnippetInit = "INSERT INTO district (code, name, level ,upper_level_district_code)  VALUES \n";
 
-        for (var groupIndex = 0; groupIndex < data.length/batchInsertNumber; groupIndex++) {
+        for (let groupIndex = 0; groupIndex < data.length/batchInsertNumber; groupIndex++) {
             var sqlSnippet = sqlSnippetInit;
-            for (var index = 0, indexInData = groupIndex * batchInsertNumber + index; index < batchInsertNumber &&indexInData<data.length ; index++) {
-                var childrenItem = data[indexInData];
-                var splitCharacter = (index === batchInsertNumber-1) ? ";\n" : ","
-                console.log("----splitCharacter",indexInData,splitCharacter,childrenItem);
+            for (let index = 0; (index < batchInsertNumber) && (groupIndex * batchInsertNumber + index<data.length) ; index++) {
+                let indexInData = groupIndex * batchInsertNumber + index
+                let childrenItem = data[indexInData];
+                let splitCharacter = (index === batchInsertNumber-1) ? ";\n" : ","
                 sqlSnippet += `("${childrenItem.code}","${childrenItem.name}","${childrenItem.level}","${childrenItem.upperLevelDistrictCode}") ${splitCharacter}`
             }
             writeSql(sqlSnippet, './data/district-'+timestamp+'.sql');
@@ -50,5 +50,5 @@ function parseSchoolJsonFile(fileName) {
 }
 
 parseDistrictJsonFile('../data/districts.json');
-parseSchoolJsonFile('../data/schools.json')
+// parseSchoolJsonFile('../data/schools.json')
 
