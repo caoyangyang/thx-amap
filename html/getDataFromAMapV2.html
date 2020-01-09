@@ -1,0 +1,122 @@
+<html>
+<script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=1.4.10&key=your_key&plugin=AMap.DistrictSearch"></script>
+<script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=1.4.15&key=your_key&plugin=AMap.PlaceSearch"></script>
+<script type="text/javascript">
+ let districtsStore = [];
+ let schoolsStore = [];
+
+ function downloadIsReadyFor(downloadData,fileName) {
+     console.log("download is ready for " + fileName);
+     const eleButton = document.getElementById(fileName);
+     const funDownload = function (content, filename) {
+         const eleLink = document.createElement('a');
+         eleLink.download = filename;
+         eleLink.style.display = 'none';
+         const blob = new Blob([content]);
+         eleLink.href = URL.createObjectURL(blob);
+         document.body.appendChild(eleLink);
+         eleLink.click();
+         document.body.removeChild(eleLink);
+     };
+     eleButton.addEventListener('click', function () {
+         console.info("--click");
+         funDownload(JSON.stringify(downloadData), fileName + '.json');
+     });
+ }
+
+ function searchSchoolByAdCode(adcode, pageIndex,index) {
+     const keywords = '小学';
+      console.info("get school",adcode+'-'+pageIndex+"~"+index);
+     AMap.plugin('AMap.PlaceSearch', function () {
+         const autoOptions = {
+             city: adcode,
+             pageSize :50,
+             type:"科教文化服务;学校;小学",
+             pageIndex
+         }
+         const placeSearch = new AMap.PlaceSearch(autoOptions);
+         placeSearch.search(keywords, function (status, result) {
+             if (result.poiList && result.poiList.count > 50 * pageIndex) {
+                 console.info("over count",adcode+'-'+pageIndex,result.poiList.count);
+                 setTimeout(()=>{
+                       searchSchoolByAdCode(adcode, pageIndex + 1,index)
+                 },pageIndex*1000)
+             }
+
+             if (result.poiList && result.poiList.count > 0) {
+                 let distractWithSchools = result.poiList.pois;
+                 schoolsStore.push({adcode, schools: distractWithSchools.map(school=>{
+                     const { address, name, id } = school;
+                     return  { address, name, id }
+                 })})
+             }
+         })
+     })
+ }
+
+ AMap.plugin('AMap.DistrictSearch', function () {
+     const districtSearch = new AMap.DistrictSearch({
+         subdistrict: 3,
+         showbiz: false
+     });
+
+function getItemAndSave(item, upperLevelDistrictCode) {
+    districtsStore.push({code: item.adcode, name: item.name, "level": item.level, upperLevelDistrictCode})
+}
+
+districtSearch.search("中国", function (status, res) {
+    if (status === 'complete') {
+        const provinces = res.districtList[0].districtList
+        provinces.forEach((provinceItem, provinceItemIndex) => {
+            getItemAndSave(provinceItem, null);
+            const cities = provinceItem.districtList;
+            if (cities) {
+                cities.forEach((cityItem, cityItemIndex) => {
+                    getItemAndSave(cityItem, provinceItem.adcode);
+                    const districts = cityItem.districtList;
+                    if (districts) {
+                        districts.forEach((districtItem, districtItemIndex) => {
+                            getItemAndSave(districtItem, cityItem.adcode);
+                            if (
+                                provinceItemIndex === provinces.length - 1 &&
+                                cityItemIndex === cities.length - 1 &&
+                                districtItemIndex === districts.length - 1
+                            ) {
+                                downloadIsReadyFor(districtsStore, "districts")
+                            }
+                        })
+                    }
+                    else {
+                        console.info("--not found district under city", cityItem)
+                    }
+                })
+            } else {
+                console.info("--not found cities under province", provinceItem)
+            }
+        });
+        let districtsCanSearchSchool = districtsStore.filter(districtItem =>
+        districtItem.level === 'district' ||  districtItem.level ==='street');
+        let uniqueDistrictsCodes = Array.from(new Set(districtsCanSearchSchool.map(districtItem=>districtItem.code)))
+        uniqueDistrictsCodes.forEach((code, index) => {
+            console.info("get nth school",code+"~"+index);
+            searchSchoolByAdCode(code, 1, index)
+            if (index === uniqueDistrictsCodes.length-1) {
+                downloadIsReadyFor(schoolsStore, "schools")
+            }
+        })
+    } else {
+        console.log("----get all cities data error")
+    }
+})
+})
+
+</script>
+<script type="text/javascript" src="https://webapi.amap.com/demos/js/liteToolbar.js"></script>
+<div id="container" class="map">
+<p><input type="button" id="districts" value="districts.json"></p>
+<p><input type="button" id="schools" value="schools.json"></p>
+</div>
+</body>
+</html>
