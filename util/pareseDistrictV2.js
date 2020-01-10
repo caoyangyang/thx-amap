@@ -22,8 +22,9 @@ function parseDistrictJsonFile(fileName) {
             for (let index = 0; (index < batchInsertNumber) && (groupIndex * batchInsertNumber + index<data.length) ; index++) {
                 let indexInData = groupIndex * batchInsertNumber + index
                 let childrenItem = data[indexInData];
-                let splitCharacter = (index === batchInsertNumber-1) ? ";\n" : ","
-                sqlSnippet += `("${childrenItem.code}","${childrenItem.name}","${childrenItem.level}","${childrenItem.upperLevelDistrictCode}") ${splitCharacter}`
+                let splitCharacter = (index === batchInsertNumber-1) ? ";\n" : ",";
+                let upperLevelDistrictCode=childrenItem.upperLevelDistrictCode?`"${childrenItem.upperLevelDistrictCode}"`:null;
+                sqlSnippet += `("${childrenItem.code}","${childrenItem.name}","${childrenItem.level}",${upperLevelDistrictCode}) ${splitCharacter}`
             }
             writeSql(sqlSnippet, './data/district-'+timestamp+'.sql');
         }
@@ -50,5 +51,5 @@ function parseSchoolJsonFile(fileName) {
 }
 
 parseDistrictJsonFile('../data/districts.json');
-// parseSchoolJsonFile('../data/schools.json')
+parseSchoolJsonFile('../data/schools.json')
 
